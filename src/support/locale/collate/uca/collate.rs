@@ -5,10 +5,10 @@ use {
     cea::generate_cea,
     first_weight::try_initial,
     normalize::make_nfd,
-    prefix::trim_prefix,
+    prefix::find_prefix,
     sort_key::compare_incremental
   },
-  crate::allocation::{vec, vec::Vec},
+  bstr::{B, ByteSlice},
   core::cmp::Ordering
 };
 
@@ -39,10 +39,10 @@ impl Collator {
       tailoring,
       shifting,
       tiebreak,
-      a_chars: vec![0; 32],
-      b_chars: vec![0; 32],
-      a_cea: vec![0; 32],
-      b_cea: vec![0; 32]
+      a_chars: Vec::new(),
+      b_chars: Vec::new(),
+      a_cea: vec![0; 64],
+      b_cea: vec![0; 64]
     }
   }
 
@@ -51,12 +51,14 @@ impl Collator {
     a: &[u8],
     b: &[u8]
   ) -> Ordering {
-    let a: Vec<u32> = a.iter().map(|x| *x as u32).collect();
-    let a: &[u32] = &a[..];
-    let b: Vec<u32> = b.iter().map(|x| *x as u32).collect();
-    let b: &[u32] = &b[..];
+    if a == b {
+      return Ordering::Equal;
+    }
 
-    self.collate_u32(a, b)
+    let mut a_iter = B(a).chars().map(|c| c as u32);
+    let mut b_iter = B(b).chars().map(|c| c as u32);
+
+    self.collate_inner(&mut a_iter, &mut b_iter)
   }
 
   pub fn collate_u32(
@@ -68,18 +70,23 @@ impl Collator {
       return Ordering::Equal;
     }
 
-    let mut a_iter = a.into_iter();
-    let mut b_iter = b.into_iter();
+    let mut a_iter = a.iter().cloned();
+    let mut b_iter = b.iter().cloned();
 
+    self.collate_inner(&mut a_iter, &mut b_iter)
+  }
+
+  fn collate_inner(
+    &mut self,
+    a_iter: &mut impl Iterator<Item = u32>,
+    b_iter: &mut impl Iterator<Item = u32>
+  ) -> Ordering {
     self.a_chars.clear();
     self.b_chars.clear();
 
-    if let Some(o) = fill_and_check(
-      &mut a_iter,
-      &mut b_iter,
-      &mut self.a_chars,
-      &mut self.b_chars
-    ) {
+    if let Some(o) =
+      fill_and_check(a_iter, b_iter, &mut self.a_chars, &mut self.b_chars)
+    {
       return o;
     }
 
@@ -88,31 +95,47 @@ impl Collator {
 
     if self.a_chars == self.b_chars {
       if self.tiebreak {
-        return a.cmp(b);
-      }
+        let a = a_iter.next().unwrap();
+        let b = b_iter.next().unwrap();
 
+        return a.cmp(&b);
+      }
       return Ordering::Equal;
     }
 
-    let shifting = self.shifting;
-    trim_prefix(&mut self.a_chars, &mut self.b_chars, shifting);
+    let offset = find_prefix(&self.a_chars, &self.b_chars, self.shifting);
 
-    if self.a_chars.is_empty() || self.b_chars.is_empty() {
-      return self.a_chars.cmp(&self.b_chars);
+    if self.a_chars[offset..].is_empty() || self.b_chars[offset..].is_empty() {
+      return self.a_chars.len().cmp(&self.b_chars.len());
     }
-
-    if let Some(o) = try_initial(self, &self.a_chars, &self.b_chars) {
+    if let Some(o) =
+      try_initial(self, &self.a_chars[offset..], &self.b_chars[offset..])
+    {
       return o;
     }
 
-    let tailoring = self.tailoring;
-    generate_cea(&mut self.a_cea, &mut self.a_chars, shifting, tailoring);
-    generate_cea(&mut self.b_cea, &mut self.b_chars, shifting, tailoring);
+    generate_cea(
+      &mut self.a_cea,
+      &mut self.a_chars,
+      self.shifting,
+      self.tailoring,
+      offset
+    );
+    generate_cea(
+      &mut self.b_cea,
+      &mut self.b_chars,
+      self.shifting,
+      self.tailoring,
+      offset
+    );
 
-    let comparison = compare_incremental(&self.a_cea, &self.b_cea, shifting);
-
+    let comparison =
+      compare_incremental(&self.a_cea, &self.b_cea, self.shifting);
     if comparison == Ordering::Equal && self.tiebreak {
-      return a.cmp(b);
+      let a = a_iter.next().unwrap();
+      let b = b_iter.next().unwrap();
+
+      return a.cmp(&b);
     }
 
     comparison

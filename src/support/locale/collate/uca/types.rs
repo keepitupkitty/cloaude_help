@@ -1,7 +1,7 @@
-use {crate::allocation::vec::Vec, hashbrown::HashMap};
+use hashbrown::HashMap;
 
-pub type SinglesTable = HashMap<u32, Vec<u32>>;
-pub type MultisTable = HashMap<Vec<u32>, Vec<u32>>;
+pub type SinglesTable = HashMap<u32, Box<[u32]>>;
+pub type MultisTable = HashMap<u64, Box<[u32]>>;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub enum Tailoring {

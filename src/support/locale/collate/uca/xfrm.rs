@@ -1,6 +1,14 @@
 use {
-  super::{Tailoring, ascii::fill, cea::generate_cea, normalize::make_nfd},
-  crate::allocation::{vec, vec::Vec}
+  super::{
+    Tailoring,
+    ascii::fill,
+    cea::generate_cea,
+    normalize::make_nfd,
+    prefix::find_prefix
+  },
+  crate::allocation::{vec, vec::Vec},
+  allocation::boxed,
+  bstr::{B, ByteSlice}
 };
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
@@ -10,7 +18,7 @@ pub struct SortKey {
   pub tiebreak: bool,
   s_chars: Vec<u32>,
   s_cea: Vec<u32>,
-  u8_cea: Vec<u8>
+  prev_cea: Vec<u32>
 }
 
 impl Default for SortKey {
@@ -29,9 +37,9 @@ impl SortKey {
       tailoring,
       shifting,
       tiebreak,
-      s_chars: vec![0; 32],
-      s_cea: vec![0; 32],
-      u8_cea: vec![0; 32]
+      s_chars: Vec::new(),
+      s_cea: vec![0; 64],
+      prev_cea: vec![0; 64]
     }
   }
 
@@ -39,54 +47,49 @@ impl SortKey {
     &mut self,
     s: &[u8]
   ) -> &[u8] {
-    let s: Vec<u32> = s.iter().map(|x| *x as u32).collect();
-    let s: &[u32] = &s[..];
-    let mut s_iter = s.into_iter();
+    let mut s_iter = B(s).chars().map(|c| c as u32);
 
-    self.s_chars.clear();
+    let cea = self.get_sortkey_inner(&mut s_iter);
+    let u8_cea: Vec<u8> = cea.iter().map(|x| *x as u8).collect();
 
-    fill(&mut s_iter, &mut self.s_chars);
-    make_nfd(&mut self.s_chars);
-    generate_cea(
-      &mut self.s_cea,
-      &mut self.s_chars,
-      self.shifting,
-      self.tailoring
-    );
-
-    let cea_len: usize = self.s_cea.len();
-    let cea_nulls: usize = self.s_cea.iter().filter(|&x| *x == 0).count();
-    let trunc: usize = cea_len - cea_nulls;
-
-    self.s_cea.truncate(trunc);
-
-    self.u8_cea = self.s_cea.iter().map(|x| *x as u8).collect();
-    &self.u8_cea[..]
+    boxed::Box::leak(u8_cea.into_boxed_slice())
   }
 
   pub fn get_sortkey_u32(
     &mut self,
     s: &[u32]
   ) -> &[u32] {
-    let mut s_iter = s.into_iter();
+    let mut s_iter = s.iter().cloned();
 
+    self.get_sortkey_inner(&mut s_iter)
+  }
+
+  fn get_sortkey_inner(
+    &mut self,
+    s_iter: &mut impl Iterator<Item = u32>
+  ) -> &[u32] {
     self.s_chars.clear();
 
-    fill(&mut s_iter, &mut self.s_chars);
+    fill(s_iter, &mut self.s_chars);
     make_nfd(&mut self.s_chars);
     generate_cea(
       &mut self.s_cea,
       &mut self.s_chars,
       self.shifting,
-      self.tailoring
+      self.tailoring,
+      0
     );
 
-    let cea_len: usize = self.s_cea.len();
-    let cea_nulls: usize = self.s_cea.iter().filter(|&x| *x == 0).count();
-    let trunc: usize = cea_len - cea_nulls;
+    if let Some(last_nonzero_idx) = self.s_cea.iter().rposition(|&x| x != 0) {
+      self.s_cea.truncate(last_nonzero_idx + 1);
+    } else {
+      self.s_cea.clear();
+    }
 
-    self.s_cea.truncate(trunc);
+    let chars: String =
+      self.s_chars.iter().map(|&c| char::from_u32(c).unwrap_or('?')).collect();
+    println!("Sort key for '{}': {:?}", chars, self.s_cea);
 
-    &self.s_cea[..]
+    &self.s_cea
   }
 }

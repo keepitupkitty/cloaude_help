@@ -54,8 +54,8 @@ fn get_first_primary(
 
   let low = if cldr { &LOW_CLDR } else { &LOW };
 
-  if val < 0x00B7 && val != 0x006C && val != 0x004C {
-    let weights = low[&val];
+  if val < 0xB7 && val != 0x6C && val != 0x4C {
+    let weights = low[val as usize];
 
     if shifting && variability(weights) {
       return 0;

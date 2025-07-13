@@ -1,9 +1,9 @@
 use {
   super::consts::{DECOMP, FCD, JAMO_LV},
-  crate::allocation::{vec, vec::Vec},
   unicode_canonical_combining_class::get_canonical_combining_class_u32
 };
 
+// Jamo-related consts; they live here for now
 const S_BASE: u32 = 0xAC00;
 const L_BASE: u32 = 0x1100;
 const V_BASE: u32 = 0x1161;
@@ -21,13 +21,10 @@ pub fn make_nfd(input: &mut Vec<u32>) {
 }
 
 fn fcd(input: &[u32]) -> bool {
-  let mut curr_lead_cc: u8;
-  let mut curr_trail_cc: u8;
-
   let mut prev_trail_cc: u8 = 0;
 
   for &c in input {
-    if c < 0x00C0 {
+    if c < 0xC0 {
       prev_trail_cc = 0;
       continue;
     }
@@ -36,18 +33,18 @@ fn fcd(input: &[u32]) -> bool {
       return false;
     }
 
-    if let Some(vals) = FCD.get(&c) {
-      [curr_lead_cc, curr_trail_cc] = vals.to_be_bytes();
+    let (lead_cc, trail_cc) = if let Some(&vals) = FCD.get(&c) {
+      vals.to_be_bytes().into()
     } else {
-      curr_lead_cc = get_canonical_combining_class_u32(c) as u8;
-      curr_trail_cc = curr_lead_cc;
-    }
+      let cc = get_canonical_combining_class_u32(c) as u8;
+      (cc, cc)
+    };
 
-    if curr_lead_cc != 0 && curr_lead_cc < prev_trail_cc {
+    if lead_cc != 0 && lead_cc < prev_trail_cc {
       return false;
     }
 
-    prev_trail_cc = curr_trail_cc;
+    prev_trail_cc = trail_cc;
   }
 
   true
@@ -59,18 +56,16 @@ fn decompose(input: &mut Vec<u32>) {
   while i < input.len() {
     let code_point = input[i];
 
-    if code_point < 0x00C0 {
+    if code_point < 0xC0 {
       i += 1;
       continue;
     }
 
     if (0xAC00..=0xD7A3).contains(&code_point) {
-      let rep = decompose_jamo(code_point);
-      let n = rep.len();
+      let (len, arr) = decompose_jamo(code_point);
+      input.splice(i..=i, arr[..len].iter().copied());
 
-      input.splice(i..=i, rep);
-
-      i += n;
+      i += len;
       continue;
     }
 
@@ -85,7 +80,7 @@ fn decompose(input: &mut Vec<u32>) {
   }
 }
 
-fn decompose_jamo(s: u32) -> Vec<u32> {
+fn decompose_jamo(s: u32) -> (usize, [u32; 3]) {
   let s_index = s - S_BASE;
 
   let lv = JAMO_LV.contains(&s);
@@ -93,19 +88,16 @@ fn decompose_jamo(s: u32) -> Vec<u32> {
   let l_index = s_index / N_COUNT;
   let v_index = (s_index % N_COUNT) / T_COUNT;
 
-  if lv {
-    let l_part = L_BASE + l_index;
-    let v_part = V_BASE + v_index;
+  let l_part = L_BASE + l_index;
+  let v_part = V_BASE + v_index;
 
-    vec![l_part, v_part]
+  if lv {
+    (2, [l_part, v_part, 0])
   } else {
     let t_index = s_index % T_COUNT;
-
-    let l_part = L_BASE + l_index;
-    let v_part = V_BASE + v_index;
     let t_part = T_BASE + t_index;
 
-    vec![l_part, v_part, t_part]
+    (3, [l_part, v_part, t_part])
   }
 }
 

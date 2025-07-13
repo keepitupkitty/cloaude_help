@@ -8,11 +8,11 @@ use {
       grow_vec,
       handle_implicit_weights,
       handle_low_weights,
+      pack_code_points,
       remove_pulled
     },
     consts::{LOW, LOW_CLDR, NEED_THREE, NEED_TWO}
   },
-  crate::allocation::{vec, vec::Vec},
   unicode_canonical_combining_class::get_canonical_combining_class_u32
 };
 
@@ -20,15 +20,15 @@ pub fn generate_cea(
   cea: &mut Vec<u32>,
   char_vals: &mut Vec<u32>,
   shifting: bool,
-  tailoring: Tailoring
+  tailoring: Tailoring,
+  mut left: usize
 ) {
   let mut input_length = char_vals.len();
 
   let cldr = tailoring != Tailoring::Ducet;
-  let low = if cldr { &LOW_CLDR } else { &LOW };
+  let low = if cldr { LOW_CLDR } else { LOW };
   let (singles, multis) = get_tables(tailoring);
 
-  let mut left: usize = 0;
   let mut cea_idx: usize = 0;
   let mut last_variable = false;
 
@@ -37,8 +37,8 @@ pub fn generate_cea(
 
     grow_vec(cea, cea_idx);
 
-    if left_val < 0x00B7 && left_val != 0x006C && left_val != 0x004C {
-      let weights = low[&left_val];
+    if left_val < 0xB7 && left_val != 0x6C && left_val != 0x4C {
+      let weights = low[left_val as usize];
       handle_low_weights(
         cea,
         weights,
@@ -76,7 +76,6 @@ pub fn generate_cea(
     while right > left {
       if right - left == 1 {
         let row = &singles[&left_val];
-
         let mut max_right = match input_length - right {
           | 3.. => right + 2,
           | 2 => right + 1,
@@ -94,13 +93,13 @@ pub fn generate_cea(
             continue;
           }
 
-          let new_subset = if try_two {
-            vec![left_val, char_vals[max_right - 1], char_vals[max_right]]
+          let new_subset: &[u32] = if try_two {
+            &[left_val, char_vals[max_right - 1], char_vals[max_right]]
           } else {
-            vec![left_val, char_vals[max_right]]
+            &[left_val, char_vals[max_right]]
           };
 
-          if let Some(new_row) = multis.get(&new_subset) {
+          if let Some(new_row) = multis.get(&pack_code_points(new_subset)) {
             fill_weights(
               cea,
               new_row,
@@ -108,6 +107,7 @@ pub fn generate_cea(
               shifting,
               &mut last_variable
             );
+
             remove_pulled(char_vals, max_right, &mut input_length, try_two);
 
             left += 1;
@@ -128,7 +128,7 @@ pub fn generate_cea(
 
       let subset = &char_vals[left..right];
 
-      if let Some(row) = multis.get(subset) {
+      if let Some(row) = multis.get(&pack_code_points(subset)) {
         let try_discont = subset.len() == 2 && (right + 1 < input_length);
 
         if try_discont {
@@ -137,9 +137,9 @@ pub fn generate_cea(
             get_canonical_combining_class_u32(char_vals[right + 1]) as u8;
 
           if ccc_a > 0 && ccc_b > ccc_a {
-            let new_subset = vec![subset[0], subset[1], char_vals[right + 1]];
+            let new_subset = &[subset[0], subset[1], char_vals[right + 1]];
 
-            if let Some(new_row) = multis.get(&new_subset) {
+            if let Some(new_row) = multis.get(&pack_code_points(new_subset)) {
               fill_weights(
                 cea,
                 new_row,
@@ -147,6 +147,7 @@ pub fn generate_cea(
                 shifting,
                 &mut last_variable
               );
+
               remove_pulled(char_vals, right + 1, &mut input_length, false);
 
               left += right - left;

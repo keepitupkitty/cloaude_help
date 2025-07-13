@@ -7,8 +7,7 @@ use {
     types::{MultisTable, SinglesTable},
     weights::{pack_weights, shift_weights}
   },
-  crate::allocation::vec::Vec,
-  once_cell::sync::Lazy,
+  std::sync::LazyLock,
   unicode_canonical_combining_class::get_canonical_combining_class_u32
 };
 
@@ -30,7 +29,7 @@ pub fn ccc_sequence_ok(test_range: &[u32]) -> bool {
 
 pub fn fill_weights(
   cea: &mut [u32],
-  row: &Vec<u32>,
+  row: &[u32],
   i: &mut usize,
   shifting: bool,
   last_variable: &mut bool
@@ -50,7 +49,7 @@ pub fn fill_weights(
 
 pub fn get_tables(
   tailoring: Tailoring
-) -> (&'static Lazy<SinglesTable>, &'static Lazy<MultisTable>) {
+) -> (&'static LazyLock<SinglesTable>, &'static LazyLock<MultisTable>) {
   match tailoring {
     | Tailoring::Cldr(Locale::ArabicScript) => (&SING_AR, &MULT_AR),
     | Tailoring::Cldr(Locale::ArabicInterleaved) => (&SING_AR_I, &MULT_AR_I),
@@ -65,7 +64,10 @@ pub fn grow_vec(
 ) {
   let l = cea.len();
 
-  if l - i < 10 {
+  // U+FDFA has 18 sets of collation weights!
+  // We also need one space for the sentinel value, so 19 would do it...
+  // But 20 is a nice round number.
+  if l - i < 20 {
     cea.resize(l * 2, 0);
   }
 }
@@ -106,12 +108,12 @@ pub fn implicit_a(cp: u32) -> u32 {
       | 0x3400..=0x4DBF |
       0x20000..=0x2A6DF |
       0x2A700..=0x2EE5D |
-      0x30000..=0x323AF => 0xFB80 + (cp >> 15),
-      | 0x4E00..=0x9FFF | 0xF900..=0xFAFF => 0xFB40 + (cp >> 15),
-      | 0x17000..=0x18AFF | 0x18D00..=0x18D8F => 0xFB00,
-      | 0x18B00..=0x18CFF => 0xFB02,
-      | 0x1B170..=0x1B2FF => 0xFB01,
-      | _ => 0xFBC0 + (cp >> 15)
+      0x30000..=0x323AF => 0xFB80 + (cp >> 15), // CJK2
+      | 0x4E00..=0x9FFF | 0xF900..=0xFAFF => 0xFB40 + (cp >> 15), // CJK1
+      | 0x17000..=0x18AFF | 0x18D00..=0x18D8F => 0xFB00,          // Tangut
+      | 0x18B00..=0x18CFF => 0xFB02,                              // Khitan
+      | 0x1B170..=0x1B2FF => 0xFB01,                              // Nushu
+      | _ => 0xFBC0 + (cp >> 15)                                  // unass.
     }
   };
 
@@ -124,17 +126,30 @@ pub fn implicit_b(cp: u32) -> u32 {
     cp & 0x7FFF
   } else {
     match cp {
-      | 0x17000..=0x18AFF | 0x18D00..=0x18D8F => cp - 0x17000,
-      | 0x18B00..=0x18CFF => cp - 0x18B00,
-      | 0x1B170..=0x1B2FF => cp - 0x1B170,
-      | _ => cp & 0x7FFF
+      | 0x17000..=0x18AFF | 0x18D00..=0x18D8F => cp - 0x17000, // Tangut
+      | 0x18B00..=0x18CFF => cp - 0x18B00,                     // Khitan
+      | 0x1B170..=0x1B2FF => cp - 0x1B170,                     // Nushu
+      | _ => cp & 0x7FFF // CJK1, CJK2, unass.
     }
   };
 
+  // BBBB always gets bitwise ORed with this value
   bbbb |= 0x8000;
 
   #[allow(clippy::cast_possible_truncation)]
   pack_weights(false, bbbb as u16, 0, 0)
+}
+
+pub fn pack_code_points(code_points: &[u32]) -> u64 {
+  match code_points.len() {
+    | 2 => (u64::from(code_points[0]) << 21) | u64::from(code_points[1]),
+    | 3 => {
+      (u64::from(code_points[0]) << 42) |
+        (u64::from(code_points[1]) << 21) |
+        u64::from(code_points[2])
+    },
+    | _ => unreachable!()
+  }
 }
 
 pub fn remove_pulled(

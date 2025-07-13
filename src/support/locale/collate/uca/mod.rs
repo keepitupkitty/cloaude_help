@@ -7,7 +7,8 @@ use {
     std::{string, wchar},
     wchar_t
   },
-  core::{cmp::Ordering, slice}
+  core::{cell::UnsafeCell, cmp::Ordering, slice},
+  once_cell::sync::OnceCell
 };
 
 mod types;
@@ -24,8 +25,25 @@ mod sort_key;
 mod tailor;
 mod weights;
 
-pub mod collate;
-pub mod xfrm;
+mod collate;
+pub use collate::Collator;
+mod xfrm;
+pub use xfrm::SortKey;
+
+struct GlobalSortKey {
+  inner: UnsafeCell<SortKey>
+}
+
+unsafe impl Sync for GlobalSortKey {}
+
+static SORTKEY: OnceCell<GlobalSortKey> = OnceCell::new();
+
+fn get_global_sortkey() -> &'static mut SortKey {
+  let global = SORTKEY.get_or_init(|| GlobalSortKey {
+    inner: UnsafeCell::new(SortKey::default())
+  });
+  unsafe { &mut *global.inner.get() }
+}
 
 fn strcoll(
   lhs: *const c_char,
@@ -36,7 +54,7 @@ fn strcoll(
   let rhs: &[u8] =
     unsafe { slice::from_raw_parts(rhs as *const u8, string::rs_strlen(rhs)) };
 
-  let mut c = collate::Collator::default();
+  let mut c = Collator::default();
   match c.collate_u8(lhs, rhs) {
     | Ordering::Less => return -1,
     | Ordering::Equal => return 0,
@@ -49,24 +67,19 @@ pub fn strxfrm(
   src: *const c_char,
   dlen: size_t
 ) -> size_t {
-  if src.is_null() {
-    return 0;
-  }
   let slen = string::rs_strlen(src);
-  if dlen >= slen {
+  if dlen >= slen && slen != 0 {
     let source: &[u8] =
-      unsafe { slice::from_raw_parts(src as *const u8, slen - 1) };
+      unsafe { slice::from_raw_parts(src as *const u8, slen) };
     let destination: &mut [u8] =
       unsafe { slice::from_raw_parts_mut(dest as *mut u8, dlen) };
 
-    let mut x = xfrm::SortKey::default();
+    let mut x = SortKey::default();
     let sk = x.get_sortkey_u8(source);
 
-    for i in 0..sk.len() {
-      destination[i] = sk[i];
+    for (i, &val) in sk.iter().enumerate().take(dlen) {
+      destination[i] = val;
     }
-
-    destination[sk.len()] = b'\0';
   }
   slen
 }
@@ -80,7 +93,7 @@ fn wcscoll(
   let rhs: &[u32] =
     unsafe { slice::from_raw_parts(rhs as *const u32, wchar::rs_wcslen(rhs)) };
 
-  let mut c = collate::Collator::default();
+  let mut c = Collator::default();
   match c.collate_u32(lhs, rhs) {
     | Ordering::Less => return -1,
     | Ordering::Equal => return 0,
@@ -93,24 +106,18 @@ fn wcsxfrm(
   src: *const wchar_t,
   dlen: size_t
 ) -> size_t {
-  if src.is_null() {
-    return 0;
-  }
   let slen = wchar::rs_wcslen(src);
-  if dlen >= slen {
+  if dlen >= slen && slen != 0 {
     let source: &[u32] =
-      unsafe { slice::from_raw_parts(src as *const u32, slen - 1) };
+      unsafe { slice::from_raw_parts(src as *const u32, slen) };
     let destination: &mut [u32] =
       unsafe { slice::from_raw_parts_mut(dest as *mut u32, dlen) };
 
-    let mut x = xfrm::SortKey::default();
-    let sk = x.get_sortkey_u32(source);
+    let sk = get_global_sortkey().get_sortkey_u32(source);
 
-    for i in 0..sk.len() {
-      destination[i] = sk[i];
+    for (i, &val) in sk.iter().enumerate().take(dlen) {
+      destination[i] = val;
     }
-
-    destination[sk.len()] = '\0' as u32;
   }
   slen
 }

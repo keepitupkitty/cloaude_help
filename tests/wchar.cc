@@ -1,6 +1,7 @@
 #include "common.h"
 
 #include <wchar.h>
+#include <string>
 
 extern "C" {
 char *rs_setlocale(int, const char *);
@@ -463,4 +464,122 @@ TEST(wctob, simple) {
     SCOPED_TRACE(i);
     ASSERT_EQ(EOF, rs_wctob(i));
   }
+}
+
+struct coll_data {
+  const wchar_t* a;
+  const wchar_t* b;
+  int result;
+};
+
+static
+void test_collate(bool use_strxfrm, const coll_data *coll, const char *locale) {
+  char *l = rs_setlocale(LC_COLLATE, locale);
+  ASSERT_EQ(l, locale);
+
+  for (unsigned int i = 0; coll[i].a != NULL; ++i) {
+    if (use_strxfrm) {
+      int result = 0;
+
+      wchar_t sortKeyA[100], sortKeyB[100];
+      rs_wcsxfrm(sortKeyA, coll[i].a, 100);
+      rs_wcsxfrm(sortKeyB, coll[i].b, 100);
+      if (rs_wcscmp(sortKeyA, sortKeyB) < 0) {
+        result = -1;
+      } else if (rs_wcscmp(sortKeyA, sortKeyB) > 0) {
+        result = 1;
+      }
+
+      //printf("str a: %ls, str b: %ls\n", coll[i].a, coll[i].b);
+      printf("result: %i, coll result: %i\n", result, coll[i].result);
+    } else {
+      ASSERT_EQ(rs_wcscoll(coll[i].a, coll[i].b), coll[i].result);
+    }
+  }
+}
+
+TEST(wcscoll, posix) {
+  const coll_data coll_posix[] = {
+    { L"", L"", 0 },
+    { L"test", L"test", 0 },
+    { L"tester", L"test", 1 },
+    { L"tEst", L"teSt", -1 },
+    { L"test", L"tester", -1 },
+    { NULL, NULL, 0 },
+  };
+
+  test_collate(false, coll_posix, "C");
+}
+
+TEST(wcscoll, uca) {
+  const coll_data coll_uca[] = {
+    { L"", L"", 0 },
+    { L"test", L"test", 0 },
+    { L"tester", L"test", 1 },
+    { L"tEst", L"test", 1 },
+    { L"test", L"tester", -1 },
+    { L"täst", L"täst", 0 },
+    { L"tast", L"täst", -1 },
+    { L"tbst", L"täst", 1 },
+    { L"tbst", L"tæst", 1 },
+    { L"täst", L"tÄst", -1 },
+    { L"tBst", L"tÄst", 1 },
+    { L"tBst", L"täst", 1 },
+    { L"taest", L"tæst", -1 },
+    { L"tafst", L"tæst", 1 },
+    { L"taa", L"täa", -1 },
+    { L"tab", L"täb", -1 },
+    { L"tad", L"täd", -1 },
+    { L"tae", L"täe", -1 },
+    { L"taf", L"täf", -1 },
+    { L"cote", L"coté", -1 },
+    { L"coté", L"côte", -1 },
+    { L"côte", L"côté", -1 },
+    { NULL, NULL, 0 },
+  };
+
+  test_collate(false, coll_uca, "UCA");
+}
+
+TEST(wcsxfrm, posix) {
+  const coll_data coll_posix[] = {
+    { L"", L"", 0 },
+    { L"test", L"test", 0 },
+    { L"tester", L"test", 1 },
+    { L"tEst", L"teSt", -1 },
+    { L"test", L"tester", -1 },
+    { NULL, NULL, 0 },
+  };
+
+  test_collate(true, coll_posix, "C");
+}
+
+TEST(wcsxfrm, uca) {
+  const coll_data coll_uca[] = {
+    { L"", L"", 0 },
+    { L"test", L"test", 0 },
+    { L"tester", L"test", 1 },
+    { L"tEst", L"test", 1 },
+    { L"test", L"tester", -1 },
+    { L"täst", L"täst", 0 },
+    { L"tast", L"täst", -1 },
+    { L"tbst", L"täst", 1 },
+    { L"tbst", L"tæst", 1 },
+    { L"täst", L"tÄst", -1 },
+    { L"tBst", L"tÄst", 1 },
+    { L"tBst", L"täst", 1 },
+    { L"taest", L"tæst", -1 },
+    { L"tafst", L"tæst", 1 },
+    { L"taa", L"täa", -1 },
+    { L"tab", L"täb", -1 },
+    { L"tad", L"täd", -1 },
+    { L"tae", L"täe", -1 },
+    { L"taf", L"täf", -1 },
+    { L"cote", L"coté", -1 },
+    { L"coté", L"côte", -1 },
+    { L"côte", L"côté", -1 },
+    { NULL, NULL, 0 },
+  };
+
+  test_collate(true, coll_uca, "UCA");
 }

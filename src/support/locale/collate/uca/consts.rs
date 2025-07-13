@@ -1,8 +1,11 @@
 use {
   super::types::{MultisTable, SinglesTable},
+  bincode::{config, serde::decode_from_slice},
   hashbrown::{HashMap, HashSet},
-  once_cell::sync::Lazy
+  std::sync::LazyLock
 };
+
+pub const BINCODE_CONF: config::Configuration = config::standard();
 
 pub const INCLUDED_UNASSIGNED: [u32; 4] = [0x2B73A, 0x2B81E, 0x2CEA2, 0x2EBE1];
 
@@ -21,8 +24,8 @@ pub const NEED_TWO: [u32; 71] = [
   0x16D69
 ];
 
-pub static JAMO_LV: Lazy<HashSet<u32>> = Lazy::new(|| {
-  HashSet::from([
+pub static JAMO_LV: LazyLock<HashSet<u32>> = LazyLock::new(|| {
+  [
     0xAC00, 0xAC1C, 0xAC38, 0xAC54, 0xAC70, 0xAC8C, 0xACA8, 0xACC4, 0xACE0,
     0xACFC, 0xAD18, 0xAD34, 0xAD50, 0xAD6C, 0xAD88, 0xADA4, 0xADC0, 0xADDC,
     0xADF8, 0xAE14, 0xAE30, 0xAE4C, 0xAE68, 0xAE84, 0xAEA0, 0xAEBC, 0xAED8,
@@ -68,82 +71,104 @@ pub static JAMO_LV: Lazy<HashSet<u32>> = Lazy::new(|| {
     0xD558, 0xD574, 0xD590, 0xD5AC, 0xD5C8, 0xD5E4, 0xD600, 0xD61C, 0xD638,
     0xD654, 0xD670, 0xD68C, 0xD6A8, 0xD6C4, 0xD6E0, 0xD6FC, 0xD718, 0xD734,
     0xD750, 0xD76C, 0xD788
-  ])
+  ]
+  .into_iter()
+  .collect::<HashSet<u32>>()
 });
 
-const DECOMP_DATA: &[u8; 38_780] = include_bytes!("bincode/decomp");
-pub static DECOMP: Lazy<SinglesTable> = Lazy::new(|| {
-  let (decoded, _) =
-    bincode::serde::decode_from_slice(DECOMP_DATA, bincode::config::legacy())
-      .unwrap();
+const DECOMP_DATA: &[u8; 19_171] = include_bytes!("bincode/decomp");
+pub static DECOMP: LazyLock<SinglesTable> = LazyLock::new(|| {
+  let decoded: SinglesTable =
+    decode_from_slice(DECOMP_DATA, BINCODE_CONF).unwrap().0;
   decoded
 });
 
-const FCD_DATA: &[u8; 12_494] = include_bytes!("bincode/fcd");
-pub static FCD: Lazy<HashMap<u32, u16>> = Lazy::new(|| {
-  let (decoded, _) =
-    bincode::serde::decode_from_slice(FCD_DATA, bincode::config::legacy())
-      .unwrap();
+const FCD_DATA: &[u8; 3_939] = include_bytes!("bincode/fcd");
+pub static FCD: LazyLock<HashMap<u32, u16>> = LazyLock::new(|| {
+  let decoded: HashMap<u32, u16> =
+    decode_from_slice(FCD_DATA, BINCODE_CONF).unwrap().0;
   decoded
 });
 
-const LOW_DATA: &[u8; 1_456] = include_bytes!("bincode/low");
-pub static LOW: Lazy<HashMap<u32, u32>> = Lazy::new(|| {
-  let (decoded, _) =
-    bincode::serde::decode_from_slice(LOW_DATA, bincode::config::legacy())
-      .unwrap();
+#[allow(clippy::unreadable_literal)]
+pub const LOW: [u32; 183] = [
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 33653792, 33719328, 33784864, 33850400, 33915936,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 34178080, 40469536,
+  54166560, 63538208, 558433312, 63603744, 63341600, 53969952, 54363168,
+  54428704, 62817312, 112493600, 36013088, 34440224, 42107936, 63144992,
+  561841184, 561906720, 561972256, 562037792, 562103328, 562168864, 562234400,
+  562299936, 562365472, 562431008, 37913632, 37520416, 112821280, 112886816,
+  112952352, 40928288, 62751776, 595595296, 597299232, 599003168, 600444960,
+  602345504, 606212128, 607195168, 609751072, 611520544, 613355552, 614993952,
+  0, 620105760, 621088800, 623644704, 626790432, 628166688, 629411872,
+  633737248, 636555296, 638849056, 641994784, 643174432, 643829792, 644616224,
+  646058016, 54494240, 63210528, 54559776, 82019360, 34309152, 81822752,
+  595592224, 597296160, 599000096, 600441888, 602342432, 606209056, 607192096,
+  609748000, 611517472, 613352480, 614990880, 0, 620102688, 621085728,
+  623641632, 626787360, 628163616, 629408800, 633734176, 636552224, 638845984,
+  641991712, 643171360, 643826720, 644613152, 646054944, 54625312, 113083424,
+  54690848, 113214496, 0, 0, 0, 0, 0, 0, 33981472, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 34190880, 40535072,
+  558367776, 558498848, 558302240, 558564384, 113148960, 62358560, 82281504,
+  102794272, 595601440, 54232096, 113017888, 0, 102925344, 82084896, 90407968,
+  112624672, 561981472, 562047008, 81888288, 657590304, 62489632
+];
+
+const SING_DATA: &[u8; 406_107] = include_bytes!("bincode/singles");
+pub static SING: LazyLock<SinglesTable> = LazyLock::new(|| {
+  let decoded: SinglesTable =
+    decode_from_slice(SING_DATA, BINCODE_CONF).unwrap().0;
   decoded
 });
 
-const SING_DATA: &[u8; 635_964] = include_bytes!("bincode/singles");
-pub static SING: Lazy<SinglesTable> = Lazy::new(|| {
-  let (decoded, _) =
-    bincode::serde::decode_from_slice(SING_DATA, bincode::config::legacy())
-      .unwrap();
+const MULT_DATA: &[u8; 18_836] = include_bytes!("bincode/multis");
+pub static MULT: LazyLock<MultisTable> = LazyLock::new(|| {
+  let decoded: MultisTable =
+    decode_from_slice(MULT_DATA, BINCODE_CONF).unwrap().0;
   decoded
 });
 
-const MULT_DATA: &[u8; 30_572] = include_bytes!("bincode/multis");
-pub static MULT: Lazy<MultisTable> = Lazy::new(|| {
-  let (decoded, _) =
-    bincode::serde::decode_from_slice(MULT_DATA, bincode::config::legacy())
-      .unwrap();
-  decoded
-});
+pub const LOW_CLDR: [u32; 183] = [
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 33653792, 33719328, 33784864, 33850400, 33915936,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 34178080, 40469536,
+  54166560, 63538208, 558433312, 63603744, 63341600, 53969952, 54363168,
+  54428704, 62817312, 112460832, 36013088, 34440224, 42107936, 63144992,
+  561841184, 561906720, 561972256, 562037792, 562103328, 562168864, 562234400,
+  562299936, 562365472, 562431008, 37913632, 37520416, 112788512, 112854048,
+  112919584, 40928288, 62751776, 662704160, 664473632, 666177568, 667619360,
+  669519904, 673386528, 674369568, 676859936, 678629408, 680464416, 682102816,
+  0, 687214624, 688197664, 690753568, 693899296, 695275552, 696520736,
+  700846112, 703664160, 705957920, 709103648, 710283296, 710938656, 711725088,
+  713166880, 54494240, 63210528, 54559776, 81986592, 34309152, 81789984,
+  662701088, 664470560, 666174496, 667616288, 669516832, 673383456, 674366496,
+  676856864, 678626336, 680461344, 682099744, 0, 687211552, 688194592,
+  690750496, 693896224, 695272480, 696517664, 700843040, 703661088, 705954848,
+  709100576, 710280224, 710935584, 711722016, 713163808, 54625312, 113050656,
+  54690848, 113181728, 0, 0, 0, 0, 0, 0, 33981472, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 34190880, 40535072,
+  558367776, 558498848, 558302240, 558564384, 113116192, 62358560, 82248736,
+  102761504, 662710304, 54232096, 112985120, 0, 102892576, 82052128, 90375200,
+  112591904, 561981472, 562047008, 81855520, 724699168, 62489632
+];
 
-const LOW_CLDR_DATA: &[u8; 1_456] = include_bytes!("bincode/low_cldr");
-pub static LOW_CLDR: Lazy<HashMap<u32, u32>> = Lazy::new(|| {
-  let (decoded, _) =
-    bincode::serde::decode_from_slice(LOW_CLDR_DATA, bincode::config::legacy())
-      .unwrap();
-  decoded
-});
-
-pub const SING_CLDR_DATA: &[u8; 635_908] =
+pub const SING_CLDR_DATA: &[u8; 406_103] =
   include_bytes!("bincode/singles_cldr");
-pub static SING_CLDR: Lazy<SinglesTable> = Lazy::new(|| {
-  let (decoded, _) = bincode::serde::decode_from_slice(
-    SING_CLDR_DATA,
-    bincode::config::legacy()
-  )
-  .unwrap();
+pub static SING_CLDR: LazyLock<SinglesTable> = LazyLock::new(|| {
+  let decoded: SinglesTable =
+    decode_from_slice(SING_CLDR_DATA, BINCODE_CONF).unwrap().0;
   decoded
 });
 
-pub const MULT_CLDR_DATA: &[u8; 30_908] = include_bytes!("bincode/multis_cldr");
-pub static MULT_CLDR: Lazy<MultisTable> = Lazy::new(|| {
-  let (decoded, _) = bincode::serde::decode_from_slice(
-    MULT_CLDR_DATA,
-    bincode::config::legacy()
-  )
-  .unwrap();
+pub const MULT_CLDR_DATA: &[u8; 19_036] = include_bytes!("bincode/multis_cldr");
+pub static MULT_CLDR: LazyLock<MultisTable> = LazyLock::new(|| {
+  let decoded: MultisTable =
+    decode_from_slice(MULT_CLDR_DATA, BINCODE_CONF).unwrap().0;
   decoded
 });
 
-const VARIABLE_DATA: &[u8; 45_436] = include_bytes!("bincode/variable");
-pub static VARIABLE: Lazy<HashSet<u32>> = Lazy::new(|| {
-  let (decoded, _) =
-    bincode::serde::decode_from_slice(VARIABLE_DATA, bincode::config::legacy())
-      .unwrap();
+const VARIABLE_DATA: &[u8; 44_974] = include_bytes!("bincode/variable");
+pub static VARIABLE: LazyLock<HashSet<u32>> = LazyLock::new(|| {
+  let decoded: HashSet<u32> =
+    decode_from_slice(VARIABLE_DATA, BINCODE_CONF).unwrap().0;
   decoded
 });

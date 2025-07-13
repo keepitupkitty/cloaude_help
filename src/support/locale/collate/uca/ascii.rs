@@ -1,24 +1,24 @@
-use {crate::allocation::vec::Vec, core::cmp::Ordering};
+use core::cmp::Ordering;
 
 pub fn fill<'a>(
-  a_iter: &mut impl Iterator<Item = &'a u32>,
-  a_chars: &mut Vec<u32>
+  s_iter: &mut impl Iterator<Item = u32>,
+  s_chars: &mut Vec<u32>
 ) {
   loop {
-    let Some(a) = a_iter.next() else { break };
-    a_chars.push(*a);
+    let Some(s) = s_iter.next() else { break };
+    s_chars.push(s);
 
-    if !ascii_alphanumeric(*a) {
+    if !ascii_alphanumeric(s) {
       break;
     }
   }
 
-  a_chars.extend(a_iter);
+  s_chars.extend(s_iter);
 }
 
-pub fn fill_and_check<'a>(
-  a_iter: &mut impl Iterator<Item = &'a u32>,
-  b_iter: &mut impl Iterator<Item = &'a u32>,
+pub fn fill_and_check(
+  a_iter: &mut impl Iterator<Item = u32>,
+  b_iter: &mut impl Iterator<Item = u32>,
   a_chars: &mut Vec<u32>,
   b_chars: &mut Vec<u32>
 ) -> Option<Ordering> {
@@ -27,17 +27,17 @@ pub fn fill_and_check<'a>(
 
   loop {
     let Some(a) = a_iter.next() else { break };
-    a_chars.push(*a);
+    a_chars.push(a);
 
-    if !ascii_alphanumeric(*a) {
+    if !ascii_alphanumeric(a) {
       bad = true;
       break;
     }
 
     let Some(b) = b_iter.next() else { break };
-    b_chars.push(*b);
+    b_chars.push(b);
 
-    if !ascii_alphanumeric(*b) {
+    if !ascii_alphanumeric(b) {
       bad = true;
       break;
     }
@@ -46,8 +46,8 @@ pub fn fill_and_check<'a>(
       continue;
     }
 
-    let a_folded = if *a > 0x005A { a - 0x20 } else { *a };
-    let b_folded = if *b > 0x005A { b - 0x20 } else { *b };
+    let a_folded = if a > 0x5A { a - 0x20 } else { a };
+    let b_folded = if b > 0x5A { b - 0x20 } else { b };
 
     if a_folded == b_folded {
       if backup.is_none() {
@@ -66,7 +66,6 @@ pub fn fill_and_check<'a>(
   if bad {
     return None;
   }
-
   if a_chars.len() != b_chars.len() {
     return Some(a_chars.len().cmp(&b_chars.len()));
   }
@@ -74,9 +73,9 @@ pub fn fill_and_check<'a>(
   backup
 }
 
-// TODO: replace with isalnum
+// TODO: replace it with iswalnum
 fn ascii_alphanumeric(c: u32) -> bool {
-  (0x0030..=0x007A).contains(&c) &&
-    !(0x003A..=0x0040).contains(&c) &&
-    !(0x005B..=0x0060).contains(&c)
+  (0x30..=0x7A).contains(&c) &&
+    !(0x3A..=0x40).contains(&c) &&
+    !(0x5B..=0x60).contains(&c)
 }
