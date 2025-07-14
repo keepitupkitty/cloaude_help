@@ -7,8 +7,7 @@ use {
     std::{string, wchar},
     wchar_t
   },
-  core::{cell::UnsafeCell, cmp::Ordering, slice},
-  once_cell::sync::OnceCell
+  core::{cmp::Ordering, slice}
 };
 
 mod types;
@@ -29,21 +28,6 @@ mod collate;
 pub use collate::Collator;
 mod xfrm;
 pub use xfrm::SortKey;
-
-struct GlobalSortKey {
-  inner: UnsafeCell<SortKey>
-}
-
-unsafe impl Sync for GlobalSortKey {}
-
-static SORTKEY: OnceCell<GlobalSortKey> = OnceCell::new();
-
-fn get_global_sortkey() -> &'static mut SortKey {
-  let global = SORTKEY.get_or_init(|| GlobalSortKey {
-    inner: UnsafeCell::new(SortKey::default())
-  });
-  unsafe { &mut *global.inner.get() }
-}
 
 fn strcoll(
   lhs: *const c_char,
@@ -107,19 +91,48 @@ fn wcsxfrm(
   dlen: size_t
 ) -> size_t {
   let slen = wchar::rs_wcslen(src);
-  if dlen >= slen && slen != 0 {
-    let source: &[u32] =
-      unsafe { slice::from_raw_parts(src as *const u32, slen) };
+  println!("wcsxfrm_debug: slen={}, dlen={}", slen, dlen);
+
+  if slen == 0 {
+    if dlen > 0 {
+      unsafe { *dest = 0 };
+    }
+    return 1;
+  }
+
+  let source: &[u32] =
+    unsafe { slice::from_raw_parts(src as *const u32, slen) };
+
+  println!("wcsxfrm_debug: source = {:?}", source);
+
+  let mut x = SortKey::default();
+  let sk = x.get_sortkey_u32(source);
+
+  println!("wcsxfrm_debug: sort key = {:?}", sk);
+
+  let required_size = sk.len() + 1;
+
+  if dlen > 0 {
     let destination: &mut [u32] =
       unsafe { slice::from_raw_parts_mut(dest as *mut u32, dlen) };
 
-    let sk = get_global_sortkey().get_sortkey_u32(source);
+    let copy_len = core::cmp::min(sk.len(), dlen.saturating_sub(1));
 
-    for (i, &val) in sk.iter().enumerate().take(dlen) {
-      destination[i] = val;
+    for i in 0..copy_len {
+      destination[i] = sk[i];
     }
+
+    if copy_len < dlen {
+      destination[copy_len] = 0;
+    }
+
+    println!(
+      "wcsxfrm_debug: destination = {:?}",
+      &destination[..core::cmp::min(copy_len + 1, dlen)]
+    );
   }
-  slen
+
+  required_size
 }
 
 pub const UCA_COLLATE: LCCollate = LCCollate {
