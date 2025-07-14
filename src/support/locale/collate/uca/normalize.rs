@@ -1,9 +1,9 @@
 use {
   super::consts::{DECOMP, FCD, JAMO_LV},
+  crate::allocation::vec::Vec,
   unicode_canonical_combining_class::get_canonical_combining_class_u32
 };
 
-// Jamo-related consts; they live here for now
 const S_BASE: u32 = 0xAC00;
 const L_BASE: u32 = 0x1100;
 const V_BASE: u32 = 0x1161;

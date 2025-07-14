@@ -1,11 +1,5 @@
 use {
-  super::{
-    Tailoring,
-    ascii::fill,
-    cea::generate_cea,
-    normalize::make_nfd,
-    prefix::find_prefix
-  },
+  super::{Tailoring, ascii::fill, cea::generate_cea, normalize::make_nfd},
   crate::allocation::{vec, vec::Vec},
   allocation::boxed,
   bstr::{B, ByteSlice}
@@ -80,15 +74,11 @@ impl SortKey {
       0
     );
 
-    if let Some(last_nonzero_idx) = self.s_cea.iter().rposition(|&x| x != 0) {
-      self.s_cea.truncate(last_nonzero_idx + 1);
+    if let Some(idx) = self.s_cea.iter().rposition(|&x| x != 0) {
+      self.s_cea.truncate(idx + 1);
     } else {
       self.s_cea.clear();
     }
-
-    let chars: String =
-      self.s_chars.iter().map(|&c| char::from_u32(c).unwrap_or('?')).collect();
-    println!("Sort key for '{}': {:?}", chars, self.s_cea);
 
     &self.s_cea
   }

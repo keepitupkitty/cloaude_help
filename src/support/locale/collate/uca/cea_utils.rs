@@ -7,6 +7,7 @@ use {
     types::{MultisTable, SinglesTable},
     weights::{pack_weights, shift_weights}
   },
+  crate::allocation::vec::Vec,
   std::sync::LazyLock,
   unicode_canonical_combining_class::get_canonical_combining_class_u32
 };
@@ -63,10 +64,6 @@ pub fn grow_vec(
   i: usize
 ) {
   let l = cea.len();
-
-  // U+FDFA has 18 sets of collation weights!
-  // We also need one space for the sentinel value, so 19 would do it...
-  // But 20 is a nice round number.
   if l - i < 20 {
     cea.resize(l * 2, 0);
   }
@@ -108,12 +105,12 @@ pub fn implicit_a(cp: u32) -> u32 {
       | 0x3400..=0x4DBF |
       0x20000..=0x2A6DF |
       0x2A700..=0x2EE5D |
-      0x30000..=0x323AF => 0xFB80 + (cp >> 15), // CJK2
-      | 0x4E00..=0x9FFF | 0xF900..=0xFAFF => 0xFB40 + (cp >> 15), // CJK1
-      | 0x17000..=0x18AFF | 0x18D00..=0x18D8F => 0xFB00,          // Tangut
-      | 0x18B00..=0x18CFF => 0xFB02,                              // Khitan
-      | 0x1B170..=0x1B2FF => 0xFB01,                              // Nushu
-      | _ => 0xFBC0 + (cp >> 15)                                  // unass.
+      0x30000..=0x323AF => 0xFB80 + (cp >> 15),
+      | 0x4E00..=0x9FFF | 0xF900..=0xFAFF => 0xFB40 + (cp >> 15),
+      | 0x17000..=0x18AFF | 0x18D00..=0x18D8F => 0xFB00,
+      | 0x18B00..=0x18CFF => 0xFB02,
+      | 0x1B170..=0x1B2FF => 0xFB01,
+      | _ => 0xFBC0 + (cp >> 15)
     }
   };
 
@@ -126,17 +123,15 @@ pub fn implicit_b(cp: u32) -> u32 {
     cp & 0x7FFF
   } else {
     match cp {
-      | 0x17000..=0x18AFF | 0x18D00..=0x18D8F => cp - 0x17000, // Tangut
-      | 0x18B00..=0x18CFF => cp - 0x18B00,                     // Khitan
-      | 0x1B170..=0x1B2FF => cp - 0x1B170,                     // Nushu
-      | _ => cp & 0x7FFF // CJK1, CJK2, unass.
+      | 0x17000..=0x18AFF | 0x18D00..=0x18D8F => cp - 0x17000,
+      | 0x18B00..=0x18CFF => cp - 0x18B00,
+      | 0x1B170..=0x1B2FF => cp - 0x1B170,
+      | _ => cp & 0x7FFF
     }
   };
 
-  // BBBB always gets bitwise ORed with this value
   bbbb |= 0x8000;
 
-  #[allow(clippy::cast_possible_truncation)]
   pack_weights(false, bbbb as u16, 0, 0)
 }
 

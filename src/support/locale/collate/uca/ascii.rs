@@ -1,4 +1,4 @@
-use core::cmp::Ordering;
+use {crate::allocation::vec::Vec, core::cmp::Ordering};
 
 pub fn fill<'a>(
   s_iter: &mut impl Iterator<Item = u32>,

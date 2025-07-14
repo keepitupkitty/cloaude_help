@@ -8,6 +8,7 @@ use {
     prefix::find_prefix,
     sort_key::compare_incremental
   },
+  crate::allocation::{vec, vec::Vec},
   bstr::{B, ByteSlice},
   core::cmp::Ordering
 };

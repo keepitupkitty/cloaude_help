@@ -1,4 +1,4 @@
-use hashbrown::HashMap;
+use {crate::allocation::boxed::Box, hashbrown::HashMap};
 
 pub type SinglesTable = HashMap<u32, Box<[u32]>>;
 pub type MultisTable = HashMap<u64, Box<[u32]>>;

@@ -1,4 +1,4 @@
-//#![no_std]
+#![no_std]
 #![allow(
   unused_macros,
   non_camel_case_types,
@@ -15,7 +15,7 @@ extern crate alloc as allocation;
 
 mod alloc;
 mod arch;
-//mod panic;
+mod panic;
 mod std;
 mod support;
 mod types;

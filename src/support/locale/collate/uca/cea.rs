@@ -13,6 +13,7 @@ use {
     },
     consts::{LOW, LOW_CLDR, NEED_THREE, NEED_TWO}
   },
+  crate::allocation::vec::Vec,
   unicode_canonical_combining_class::get_canonical_combining_class_u32
 };
 
