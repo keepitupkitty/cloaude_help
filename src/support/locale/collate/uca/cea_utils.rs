@@ -8,7 +8,7 @@ use {
     weights::{pack_weights, shift_weights}
   },
   crate::allocation::vec::Vec,
-  std::sync::LazyLock,
+  once_cell::sync::Lazy,
   unicode_canonical_combining_class::get_canonical_combining_class_u32
 };
 
@@ -50,7 +50,7 @@ pub fn fill_weights(
 
 pub fn get_tables(
   tailoring: Tailoring
-) -> (&'static LazyLock<SinglesTable>, &'static LazyLock<MultisTable>) {
+) -> (&'static Lazy<SinglesTable>, &'static Lazy<MultisTable>) {
   match tailoring {
     | Tailoring::Cldr(Locale::ArabicScript) => (&SING_AR, &MULT_AR),
     | Tailoring::Cldr(Locale::ArabicInterleaved) => (&SING_AR_I, &MULT_AR_I),

@@ -2,7 +2,7 @@ use {
   super::types::{MultisTable, SinglesTable},
   bincode::{config, serde::decode_from_slice},
   hashbrown::{HashMap, HashSet},
-  std::sync::LazyLock
+  once_cell::sync::Lazy
 };
 
 pub const BINCODE_CONF: config::Configuration = config::standard();
@@ -24,7 +24,7 @@ pub const NEED_TWO: [u32; 71] = [
   0x16D69
 ];
 
-pub static JAMO_LV: LazyLock<HashSet<u32>> = LazyLock::new(|| {
+pub static JAMO_LV: Lazy<HashSet<u32>> = Lazy::new(|| {
   [
     0xAC00, 0xAC1C, 0xAC38, 0xAC54, 0xAC70, 0xAC8C, 0xACA8, 0xACC4, 0xACE0,
     0xACFC, 0xAD18, 0xAD34, 0xAD50, 0xAD6C, 0xAD88, 0xADA4, 0xADC0, 0xADDC,
@@ -77,14 +77,14 @@ pub static JAMO_LV: LazyLock<HashSet<u32>> = LazyLock::new(|| {
 });
 
 const DECOMP_DATA: &[u8; 19_171] = include_bytes!("bincode/decomp");
-pub static DECOMP: LazyLock<SinglesTable> = LazyLock::new(|| {
+pub static DECOMP: Lazy<SinglesTable> = Lazy::new(|| {
   let decoded: SinglesTable =
     decode_from_slice(DECOMP_DATA, BINCODE_CONF).unwrap().0;
   decoded
 });
 
 const FCD_DATA: &[u8; 3_939] = include_bytes!("bincode/fcd");
-pub static FCD: LazyLock<HashMap<u32, u16>> = LazyLock::new(|| {
+pub static FCD: Lazy<HashMap<u32, u16>> = Lazy::new(|| {
   let decoded: HashMap<u32, u16> =
     decode_from_slice(FCD_DATA, BINCODE_CONF).unwrap().0;
   decoded
@@ -115,14 +115,14 @@ pub const LOW: [u32; 183] = [
 ];
 
 const SING_DATA: &[u8; 406_107] = include_bytes!("bincode/singles");
-pub static SING: LazyLock<SinglesTable> = LazyLock::new(|| {
+pub static SING: Lazy<SinglesTable> = Lazy::new(|| {
   let decoded: SinglesTable =
     decode_from_slice(SING_DATA, BINCODE_CONF).unwrap().0;
   decoded
 });
 
 const MULT_DATA: &[u8; 18_836] = include_bytes!("bincode/multis");
-pub static MULT: LazyLock<MultisTable> = LazyLock::new(|| {
+pub static MULT: Lazy<MultisTable> = Lazy::new(|| {
   let decoded: MultisTable =
     decode_from_slice(MULT_DATA, BINCODE_CONF).unwrap().0;
   decoded
@@ -153,21 +153,21 @@ pub const LOW_CLDR: [u32; 183] = [
 
 pub const SING_CLDR_DATA: &[u8; 406_103] =
   include_bytes!("bincode/singles_cldr");
-pub static SING_CLDR: LazyLock<SinglesTable> = LazyLock::new(|| {
+pub static SING_CLDR: Lazy<SinglesTable> = Lazy::new(|| {
   let decoded: SinglesTable =
     decode_from_slice(SING_CLDR_DATA, BINCODE_CONF).unwrap().0;
   decoded
 });
 
 pub const MULT_CLDR_DATA: &[u8; 19_036] = include_bytes!("bincode/multis_cldr");
-pub static MULT_CLDR: LazyLock<MultisTable> = LazyLock::new(|| {
+pub static MULT_CLDR: Lazy<MultisTable> = Lazy::new(|| {
   let decoded: MultisTable =
     decode_from_slice(MULT_CLDR_DATA, BINCODE_CONF).unwrap().0;
   decoded
 });
 
 const VARIABLE_DATA: &[u8; 44_974] = include_bytes!("bincode/variable");
-pub static VARIABLE: LazyLock<HashSet<u32>> = LazyLock::new(|| {
+pub static VARIABLE: Lazy<HashSet<u32>> = Lazy::new(|| {
   let decoded: HashSet<u32> =
     decode_from_slice(VARIABLE_DATA, BINCODE_CONF).unwrap().0;
   decoded
